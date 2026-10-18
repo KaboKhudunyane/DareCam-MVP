@@ -1,39 +1,19 @@
-import js from '@eslint/js';
-import tseslint from '@typescript-eslint/eslint-plugin';
-import tsParser from '@typescript-eslint/parser';
-import reactHooks from 'eslint-plugin-react-hooks';
-import reactRefresh from 'eslint-plugin-react-refresh';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import LandingPage from './pages/LandingPage';
+import OnboardingPage from './pages/OnboardingPage';
+import LobbyPage from './pages/LobbyPage';
+import SessionPage from './pages/SessionPage';
 
-export default [
-  { ignores: ['dist', 'assets'] },
-  js.configs.recommended,
-  {
-    files: ['**/*.{ts,tsx}'],
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-        ecmaFeatures: { jsx: true },
-      },
-      globals: {
-        window: 'readonly',
-        document: 'readonly',
-        console: 'readonly',
-        localStorage: 'readonly',
-      },
-    },
-    plugins: {
-      '@typescript-eslint': tseslint,
-      'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
-    },
-    rules: {
-      ...tseslint.configs.recommended.rules,
-      '@typescript-eslint/no-explicit-any': 'error',
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
-    },
-  },
-];
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/onboard" element={<OnboardingPage />} />
+        <Route path="/lobby" element={<LobbyPage />} />
+        <Route path="/session" element={<SessionPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
