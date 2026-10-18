@@ -1,34 +1,56 @@
-{
-  "name": "darecam-mvp",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.1.0",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.0",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "eslint": "^9.0.0",
-    "eslint-plugin-react-hooks": "^9.0.0",
-    "eslint-plugin-react-refresh": "^0.4.0",
-    "jsdom": "^25.0.0",
-    "typescript": "^5.6.0",
-    "vite": "^5.4.10",
-    "vitest": "^2.1.4"
+export type DemoRole = 'host' | 'player';
+
+export type DemoProfile = {
+  displayName: string;
+  city: string;
+  role: DemoRole;
+  avatar: string;
+};
+
+export const DEFAULT_PROFILE: DemoProfile = {
+  displayName: 'Kabo',
+  city: 'Johannesburg',
+  role: 'host',
+  avatar: 'K',
+};
+
+const STORAGE_KEY = 'darecam-demo-profile';
+
+export function getDemoProfile(): DemoProfile {
+  if (typeof window === 'undefined') {
+    return DEFAULT_PROFILE;
   }
+
+  const raw = window.localStorage.getItem(STORAGE_KEY);
+
+  if (!raw) {
+    return DEFAULT_PROFILE;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<DemoProfile>;
+    return {
+      displayName: parsed.displayName?.trim() || DEFAULT_PROFILE.displayName,
+      city: parsed.city?.trim() || DEFAULT_PROFILE.city,
+      role: parsed.role === 'player' ? 'player' : 'host',
+      avatar: (parsed.displayName || DEFAULT_PROFILE.displayName).trim().charAt(0).toUpperCase() || DEFAULT_PROFILE.avatar,
+    };
+  } catch {
+    return DEFAULT_PROFILE;
+  }
+}
+
+export function saveDemoProfile(profile: DemoProfile) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const normalized: DemoProfile = {
+    displayName: profile.displayName.trim() || DEFAULT_PROFILE.displayName,
+    city: profile.city.trim() || DEFAULT_PROFILE.city,
+    role: profile.role === 'player' ? 'player' : 'host',
+    avatar: (profile.displayName || DEFAULT_PROFILE.displayName).trim().charAt(0).toUpperCase() || DEFAULT_PROFILE.avatar,
+  };
+
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
 }
