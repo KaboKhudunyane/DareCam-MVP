@@ -1,4 +1,6 @@
-{
-  "compilerOptions":{"target":"ES2022","useDefineForClassFields":true,"module":"ESNext","moduleResolution":"Bundler","strict":true,"noEmit":true,"lib":["ES2022","DOM"]},
-  "include":["src","vite.config.ts","tests"]
-}
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+});

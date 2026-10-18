@@ -1,0 +1,387 @@
+import { useMemo, useState } from 'react';
+
+type Role = 'player' | 'host';
+
+type Card = {
+  id: number;
+  title: string;
+  category: string;
+  points: number;
+  difficulty: 'Easy' | 'Medium' | 'Wild';
+  description: string;
+  progress: number;
+  totalSteps: number;
+};
+
+type PlayerProfile = {
+  id: number;
+  name: string;
+  city: string;
+  status: 'In queue' | 'Live now' | 'Awaiting review';
+  streak: number;
+  rating: number;
+  avatar: string;
+};
+
+type ChatMessage = {
+  id: number;
+  sender: 'Host' | 'Player' | 'System';
+  text: string;
+};
+
+type LeaderboardRow = {
+  id: number;
+  name: string;
+  score: number;
+  badge: string;
+};
+
+const queue: PlayerProfile[] = [
+  { id: 1, name: 'Zuri', city: 'Johannesburg', status: 'Live now', streak: 4, rating: 96, avatar: 'Z' },
+  { id: 2, name: 'Aphiwe', city: 'Cape Town', status: 'In queue', streak: 2, rating: 91, avatar: 'A' },
+  { id: 3, name: 'Lethabo', city: 'Durban', status: 'Awaiting review', streak: 5, rating: 98, avatar: 'L' },
+];
+
+const cards: Card[] = [
+  {
+    id: 1,
+    title: 'Wave at camera',
+    category: 'Icebreaker',
+    points: 100,
+    difficulty: 'Easy',
+    description: 'Give the host a proper wave and a quick smile.',
+    progress: 1,
+    totalSteps: 1,
+  },
+  {
+    id: 2,
+    title: 'Name 5 snacks',
+    category: 'Mini-game',
+    points: 150,
+    difficulty: 'Medium',
+    description: 'List five of your favourite snacks without pausing.',
+    progress: 2,
+    totalSteps: 3,
+  },
+  {
+    id: 3,
+    title: 'Show your setup',
+    category: 'Movement',
+    points: 200,
+    difficulty: 'Wild',
+    description: 'Spin the camera to reveal your desk setup and laugh at it.',
+    progress: 1,
+    totalSteps: 2,
+  },
+  {
+    id: 4,
+    title: 'Answer 5 questions',
+    category: 'Would you rather',
+    points: 250,
+    difficulty: 'Medium',
+    description: 'Give quick answers to five rapid-fire prompts.',
+    progress: 2,
+    totalSteps: 5,
+  },
+];
+
+const starterChat: ChatMessage[] = [
+  { id: 1, sender: 'Host', text: 'Nice vibe, let us keep it playful and safe.' },
+  { id: 2, sender: 'Player', text: 'Absolutely. I am ready for the next challenge.' },
+  { id: 3, sender: 'System', text: 'Reward suggestion: R50 prepaid airtime for today.' },
+];
+
+const rewardIdeas = ['R50 airtime', 'Movie night voucher', 'Snack box', 'Spotify premium month'];
+
+const initialLeaderboard: LeaderboardRow[] = [
+  { id: 1, name: 'Zuri', score: 1420, badge: 'Top of the day' },
+  { id: 2, name: 'Mila', score: 1380, badge: 'Hot streak' },
+  { id: 3, name: 'You', score: 420, badge: 'New challenger' },
+];
+
+const formatScore = (value: number) => `${value.toLocaleString()} pts`;
+
+export default function App() {
+  const [role, setRole] = useState<Role>('host');
+  const [adultConfirmed, setAdultConfirmed] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [currentPlayer, setCurrentPlayer] = useState<PlayerProfile>(queue[0]);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [verified, setVerified] = useState(false);
+  const [score, setScore] = useState(420);
+  const [chat, setChat] = useState<ChatMessage[]>(starterChat);
+  const [draft, setDraft] = useState('');
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>(initialLeaderboard);
+
+  const currentCard = cards[currentCardIndex];
+
+  const queueIndex = useMemo(
+    () => queue.findIndex((player) => player.id === currentPlayer.id),
+    [currentPlayer.id],
+  );
+
+  const nextPlayer = () => {
+    const nextIndex = (queueIndex + 1) % queue.length;
+    setCurrentPlayer(queue[nextIndex]);
+    setCurrentCardIndex(0);
+    setVerified(false);
+  };
+
+  const handleVerify = () => {
+    if (verified) {
+      return;
+    }
+
+    const nextScore = score + currentCard.points;
+    setScore(nextScore);
+    setVerified(true);
+    setLeaderboard((previous) =>
+      previous.map((entry) =>
+        entry.name === 'You' ? { ...entry, score: nextScore, badge: 'On fire' } : entry,
+      ),
+    );
+  };
+
+  const handleNextCard = () => {
+    setCurrentCardIndex((prev) => (prev + 1) % cards.length);
+    setVerified(false);
+  };
+
+  const handleSkip = () => {
+    setCurrentCardIndex((prev) => (prev + 1) % cards.length);
+    setVerified(false);
+  };
+
+  const handleSendChat = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!draft.trim()) {
+      return;
+    }
+
+    setChat((previous) => [...previous, { id: Date.now(), sender: 'Host', text: draft.trim() }]);
+    setDraft('');
+  };
+
+  const canEnter = adultConfirmed && consentAccepted;
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">DareCam</p>
+          <h1>Live host game, safe and playful.</h1>
+        </div>
+
+        <div className="topbar-actions">
+          <span className="status-pill success">Local mock mode</span>
+          <div className="segmented-control" aria-label="Role selector">
+            <button
+              type="button"
+              className={role === 'host' ? 'active' : ''}
+              onClick={() => setRole('host')}
+            >
+              Host
+            </button>
+            <button
+              type="button"
+              className={role === 'player' ? 'active' : ''}
+              onClick={() => setRole('player')}
+            >
+              Player
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {!canEnter ? (
+        <section className="gate-panel">
+          <div className="gate-copy">
+            <p className="eyebrow">Age guard</p>
+            <h2>18+ and consent required</h2>
+            <p>
+              DareCam is designed for adults only. This demo shows the MVP onboarding flow and
+              safe-session consent before a live card is played.
+            </p>
+          </div>
+
+          <div className="gate-actions">
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={adultConfirmed}
+                onChange={(event) => setAdultConfirmed(event.target.checked)}
+              />
+              I confirm I am 18 or older.
+            </label>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={consentAccepted}
+                onChange={(event) => setConsentAccepted(event.target.checked)}
+              />
+              I understand the host is watching live and I consent before each session.
+            </label>
+
+            <button type="button" className="primary-button" onClick={() => setRole('player')}>
+              Enter lobby
+            </button>
+          </div>
+        </section>
+      ) : (
+        <main className="main-grid">
+          <section className="panel live-panel">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Session</p>
+                <h3>{role === 'host' ? 'Host console' : 'Player view'}</h3>
+              </div>
+              <button type="button" className="secondary-button" onClick={nextPlayer}>
+                Next player
+              </button>
+            </div>
+
+            <div className="video-stage">
+              <div className="video-portrait">
+                <span>{currentPlayer.avatar}</span>
+              </div>
+              <div className="video-meta">
+                <strong>{currentPlayer.name}</strong>
+                <span>{currentPlayer.city}</span>
+                <span>Streak {currentPlayer.streak} • Rating {currentPlayer.rating}%</span>
+              </div>
+            </div>
+
+            <div className="stats-row">
+              <div className="stat-box">
+                <label>Queue</label>
+                <strong>{queue.length} waiting</strong>
+              </div>
+              <div className="stat-box">
+                <label>Points</label>
+                <strong>{formatScore(score)}</strong>
+              </div>
+              <div className="stat-box">
+                <label>Rank</label>
+                <strong>#3 today</strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="panel card-panel">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Current card</p>
+                <h3>{currentCard.title}</h3>
+              </div>
+              <span className="status-pill neutral">{currentCard.category}</span>
+            </div>
+
+            <div className="card-body">
+              <div className="card-badges">
+                <span className="tag">{currentCard.difficulty}</span>
+                <span className="tag">{currentCard.points} pts</span>
+              </div>
+              <p>{currentCard.description}</p>
+
+              <div className="progress-wrap">
+                <div className="progress-bar">
+                  <span style={{ width: `${(currentCard.progress / currentCard.totalSteps) * 100}%` }} />
+                </div>
+                <small>
+                  Step {currentCard.progress}/{currentCard.totalSteps}
+                </small>
+              </div>
+
+              <div className="action-row">
+                <button type="button" className="primary-button" onClick={handleVerify}>
+                  {verified ? 'Verified' : 'Verify'}
+                </button>
+                <button type="button" className="secondary-button" onClick={handleNextCard}>
+                  Next
+                </button>
+                <button type="button" className="ghost-button" onClick={handleSkip}>
+                  Skip
+                </button>
+              </div>
+            </div>
+
+            <div className="card-list">
+              {cards.map((card, index) => (
+                <button
+                  key={card.id}
+                  type="button"
+                  className={index === currentCardIndex ? 'mini-card active' : 'mini-card'}
+                  onClick={() => setCurrentCardIndex(index)}
+                >
+                  <span>{card.title}</span>
+                  <strong>{card.points} pts</strong>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <aside className="panel sidebar-panel">
+            <div className="panel-header compact">
+              <div>
+                <p className="eyebrow">Chat</p>
+                <h3>Host + player</h3>
+              </div>
+            </div>
+
+            <div className="chat-list">
+              {chat.map((message) => (
+                <div key={message.id} className={`message ${message.sender.toLowerCase()}`}>
+                  <span>{message.sender}</span>
+                  <p>{message.text}</p>
+                </div>
+              ))}
+            </div>
+
+            <form className="composer" onSubmit={handleSendChat}>
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder="Suggest a reward or give a prompt"
+                aria-label="Chat message"
+              />
+              <button type="submit">Send</button>
+            </form>
+
+            <div className="reward-box">
+              <p className="eyebrow">Reward ideas</p>
+              <div className="reward-list">
+                {rewardIdeas.map((idea) => (
+                  <button type="button" key={idea} className="reward-chip">
+                    {idea}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </aside>
+
+          <section className="panel leaderboard-panel">
+            <div className="panel-header compact">
+              <div>
+                <p className="eyebrow">Daily leaderboard</p>
+                <h3>Top scores</h3>
+              </div>
+            </div>
+
+            <div className="leaderboard-list">
+              {leaderboard.map((entry) => (
+                <div key={entry.id} className="leader-row">
+                  <div>
+                    <strong>{entry.name}</strong>
+                    <small>{entry.badge}</small>
+                  </div>
+                  <span>{formatScore(entry.score)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </main>
+      )}
+    </div>
+  );
+}
