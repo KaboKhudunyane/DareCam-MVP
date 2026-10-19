@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DEFAULT_PROFILE, saveDemoProfile, type DemoRole } from '../demoState';
+import { DEFAULT_PROFILE, saveDemoProfile, type DemoRole } from '../demoProfile';
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
