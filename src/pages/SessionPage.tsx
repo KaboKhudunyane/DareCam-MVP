@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { queue } from '../mockData';
-import { getDemoProfile } from '../demoState';
+import { getDemoProfile } from '../demoProfile';
 
 export default function LobbyPage() {
   const navigate = useNavigate();
