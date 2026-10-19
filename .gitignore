@@ -1,0 +1,5 @@
+# Ignore build artifacts
+/dist
+
+# Optional: ignore Vite-generated assets if you don't want them committed
+/assets
