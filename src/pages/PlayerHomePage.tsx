@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addPlayerToQueue, getGameState, getPlayerSettings, savePlayerSettings, startSessionForPlayer, subscribeToGameState } from '../gameState';
+import { addPlayerToQueue, getGameState, getPlayerSettings, savePlayerSettings, subscribeToGameState } from '../gameState';
 
 export default function PlayerHomePage() {
   const navigate = useNavigate();
@@ -25,13 +25,15 @@ export default function PlayerHomePage() {
 
     const playerName = nickname.trim();
     const playerAge = Number(age);
-    const profileId = storedProfile.playerId || `player-${Date.now()}`;
+    const profileId = storedProfile.playerId || `player-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     savePlayerSettings(profileId, playerName, String(playerAge));
-    const nextState = addPlayerToQueue(playerName, playerAge);
+    const nextState = addPlayerToQueue(playerName, playerAge, profileId);
 
-    if (nextState.queue.some((player) => player.name === playerName && player.age === playerAge)) {
+    const joinedPlayer = nextState.queue.find((player) => player.id === profileId);
+    if (joinedPlayer) {
       setGameState(nextState);
+      setStatus('');
       navigate('/lobby');
     }
   };
@@ -39,68 +41,28 @@ export default function PlayerHomePage() {
   return (
     <div className="page-shell landing-page">
       <header className="top-nav">
-        <div className="brand-block">
-          <span className="brand-mark">D</span>
-          <span>DareCam</span>
-        </div>
-        <nav className="top-nav-actions">
-          <button type="button" className="ghost-button small-button" onClick={() => navigate('/admin')}>
-            Host login
-          </button>
-        </nav>
+        <div className="brand-block"><span className="brand-mark">D</span><span>DareCam</span></div>
+        <nav className="top-nav-actions"><button type="button" className="ghost-button small-button" onClick={() => navigate('/admin')}>Host login</button></nav>
       </header>
 
       <main className="hero-section">
         <div className="hero-copy">
           <p className="eyebrow">Live game. Safe by design.</p>
           <h1>Turn a live camera into a playful host-led challenge show.</h1>
-          <p className="lede">
-            We match one player with one host. The host controls the prompts. You complete the challenge, the host reviews it live, and points climb up the daily leaderboard.
-          </p>
-
+          <p className="lede">We match one player with one host. The host controls the prompts. You complete the challenge, the host reviews it live, and points climb up the daily leaderboard.</p>
           <div className="player-form">
-            <label>
-              Nickname
-              <input value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="e.g. Zuri" />
-            </label>
-
-            <label>
-              Age
-              <input type="number" min={18} max={99} value={age} onChange={(event) => setAge(event.target.value)} />
-            </label>
-
-            <div className="button-row">
-              <button type="button" className="primary-button" onClick={handleJoin} disabled={!canJoin}>
-                Join the lobby
-              </button>
-            </div>
-
+            <label>Nickname<input value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="e.g. Zuri" maxLength={30} /></label>
+            <label>Age<input type="number" min={18} max={99} value={age} onChange={(event) => setAge(event.target.value)} /></label>
+            <div className="button-row"><button type="button" className="primary-button" onClick={handleJoin} disabled={!canJoin}>Join the lobby</button></div>
             {status ? <small className="form-status">{status}</small> : null}
           </div>
         </div>
 
         <div className="hero-panel">
           <div className="mini-console">
-            <div className="mini-header">
-              <span className="live-dot" />
-              Waiting room preview
-            </div>
-            <div className="mini-stage">
-              <div className="mini-card-surface">
-                <span>{gameState.cards[0]?.prompt ?? 'Wave at camera'}</span>
-                <strong>{gameState.cards[0]?.points ?? 100} pts</strong>
-              </div>
-            </div>
-            <div className="mini-metrics">
-              <div>
-                <label>Queue</label>
-                <strong>{gameState.queue.length} waiting</strong>
-              </div>
-              <div>
-                <label>Reward</label>
-                <strong>Top scorer wins</strong>
-              </div>
-            </div>
+            <div className="mini-header"><span className="live-dot" />Waiting room preview</div>
+            <div className="mini-stage"><div className="mini-card-surface"><span>{gameState.cards[0]?.prompt ?? 'Wave at camera'}</span><strong>{gameState.cards[0]?.points ?? 100} pts</strong></div></div>
+            <div className="mini-metrics"><div><label>Queue</label><strong>{gameState.queue.filter((player) => player.status === 'waiting').length} waiting</strong></div><div><label>Reward</label><strong>Top scorer wins</strong></div></div>
           </div>
         </div>
       </main>
