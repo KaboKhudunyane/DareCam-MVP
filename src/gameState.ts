@@ -4,7 +4,16 @@ export type GameCard = { id: string; type: GameCardType; prompt: string; points:
 export type QueuePlayer = { id: string; name: string; age: number; score: number; joinedAt: number; status: 'waiting' | 'in-session' | 'done' };
 export type ChatMessage = { id: string; sender: 'Host' | 'Player' | 'System'; text: string };
 export type LeaderboardEntry = { id: string; name: string; score: number; badge: string };
-export type GameState = { queue: QueuePlayer[]; currentPlayerId: string | null; cards: GameCard[]; currentCardIndex: number; chat: ChatMessage[]; leaderboard: LeaderboardEntry[]; sessionStatus: 'waiting' | 'active' | 'review' };
+export type GameState = {
+  queue: QueuePlayer[];
+  currentPlayerId: string | null;
+  cards: GameCard[];
+  currentCardIndex: number;
+  chat: ChatMessage[];
+  leaderboard: LeaderboardEntry[];
+  sessionStatus: 'waiting' | 'active' | 'review';
+  acceptedCardKeys: string[];
+};
 
 export const STORAGE_KEY = 'darecam-game-store-v1';
 export const PLAYER_STORAGE_KEY = 'darecam-player-id';
@@ -19,12 +28,17 @@ export const DEFAULT_CARDS: GameCard[] = [
 ];
 
 export const DEFAULT_STATE: GameState = {
-  queue: [], currentPlayerId: null, cards: DEFAULT_CARDS, currentCardIndex: 0,
+  queue: [],
+  currentPlayerId: null,
+  cards: DEFAULT_CARDS,
+  currentCardIndex: 0,
   chat: [{ id: 'welcome', sender: 'System', text: 'Queue is open. The next player will appear here.' }],
   leaderboard: [
     { id: 'leader-1', name: 'Zuri', score: 1420, badge: 'Top of the day' },
     { id: 'leader-2', name: 'Mila', score: 1380, badge: 'Hot streak' },
-  ], sessionStatus: 'waiting',
+  ],
+  sessionStatus: 'waiting',
+  acceptedCardKeys: [],
 };
 
 const cloneState = (state: GameState): GameState => JSON.parse(JSON.stringify(state));
@@ -43,6 +57,7 @@ export function getGameState(): GameState {
       chat: Array.isArray(parsed.chat) ? parsed.chat : cloneState(DEFAULT_STATE.chat),
       leaderboard: Array.isArray(parsed.leaderboard) ? parsed.leaderboard : cloneState(DEFAULT_STATE.leaderboard),
       sessionStatus: parsed.sessionStatus ?? 'waiting',
+      acceptedCardKeys: Array.isArray(parsed.acceptedCardKeys) ? parsed.acceptedCardKeys : [],
     };
   } catch { return cloneState(DEFAULT_STATE); }
 }
@@ -51,7 +66,7 @@ export function commitGameState(nextState: GameState): GameState {
   const clean = cloneState(nextState);
   if (typeof window !== 'undefined') {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
-    try { const channel = new BroadcastChannel(CHANNEL_NAME); channel.postMessage({ type: 'darecam-state-update' }); channel.close(); } catch { /* localStorage/custom events are fallbacks */ }
+    try { const channel = new BroadcastChannel(CHANNEL_NAME); channel.postMessage({ type: 'darecam-state-update' }); channel.close(); } catch { /* storage/custom events are fallbacks */ }
     window.dispatchEvent(new Event('darecam-state-change'));
   }
   return clean;
@@ -88,14 +103,26 @@ export function savePlayerSettings(playerId: string, nickname: string, age: stri
 
 export function addPlayerToQueue(name: string, age: number, explicitId?: string): GameState {
   return updateGameState((state) => {
-    const existing = explicitId ? state.queue.find((p) => p.id === explicitId) : state.queue.find((p) => p.name.toLowerCase() === name.trim().toLowerCase() && p.status !== 'done');
+    const cleanName = name.trim();
+    const existing = explicitId ? state.queue.find((p) => p.id === explicitId) : state.queue.find((p) => p.name.toLowerCase() === cleanName.toLowerCase() && p.status !== 'done');
     if (existing) {
-      const queue = state.queue.map((p) => p.id === existing.id ? { ...p, name: name.trim(), age, status: p.status === 'done' ? ('waiting' as const) : p.status } : p);
+      const queue = state.queue.map((p) => p.id === existing.id
+        ? { ...p, name: cleanName, age, status: p.status === 'done' ? ('waiting' as const) : p.status, score: p.status === 'done' ? 0 : p.score }
+        : p);
       return { ...state, queue };
     }
     const id = explicitId || `player-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    return { ...state, queue: [...state.queue, { id, name: name.trim(), age, score: 0, joinedAt: Date.now(), status: 'waiting' }] };
+    return { ...state, queue: [...state.queue, { id, name: cleanName, age, score: 0, joinedAt: Date.now(), status: 'waiting' }] };
   });
+}
+
+export function leaveQueue(playerId: string): GameState {
+  return updateGameState((state) => ({
+    ...state,
+    queue: state.queue.filter((player) => player.id !== playerId),
+    currentPlayerId: state.currentPlayerId === playerId ? null : state.currentPlayerId,
+    sessionStatus: state.currentPlayerId === playerId ? 'waiting' : state.sessionStatus,
+  }));
 }
 
 export function startSessionForPlayer(playerId: string): GameState {
@@ -103,7 +130,7 @@ export function startSessionForPlayer(playerId: string): GameState {
     const target = state.queue.find((p) => p.id === playerId);
     if (!target || target.status === 'done') return state;
     const queue = state.queue.map((p) => ({ ...p, status: p.id === playerId ? ('in-session' as const) : p.status === 'in-session' ? ('waiting' as const) : p.status }));
-    return { ...state, queue, currentPlayerId: playerId, currentCardIndex: 0, sessionStatus: 'active', chat: [...state.chat, { id: `chat-${Date.now()}`, sender: 'System', text: `${target.name} joined the live session.` }] };
+    return { ...state, queue, currentPlayerId: playerId, currentCardIndex: 0, sessionStatus: 'active', acceptedCardKeys: [], chat: [...state.chat, { id: `chat-${Date.now()}`, sender: 'System', text: `${target.name} joined the live session.` }] };
   });
 }
 
@@ -111,7 +138,7 @@ export function endSession(): GameState {
   return updateGameState((state) => {
     const active = state.queue.find((p) => p.id === state.currentPlayerId);
     const queue = state.queue.map((p) => p.id === state.currentPlayerId ? { ...p, status: 'done' as const } : p);
-    return { ...state, queue, currentPlayerId: null, currentCardIndex: 0, sessionStatus: 'waiting', chat: [...state.chat, { id: `chat-${Date.now()}`, sender: 'System', text: active ? `${active.name}'s session ended.` : 'The session ended.' }] };
+    return { ...state, queue, currentPlayerId: null, currentCardIndex: 0, sessionStatus: 'waiting', acceptedCardKeys: [], chat: [...state.chat, { id: `chat-${Date.now()}`, sender: 'System', text: active ? `${active.name}'s session ended.` : 'The session ended.' }] };
   });
 }
 
@@ -124,13 +151,16 @@ export function acceptCurrentCard(): GameState {
     const card = state.cards[state.currentCardIndex % state.cards.length];
     const active = state.queue.find((p) => p.id === state.currentPlayerId);
     if (!active) return state;
+    const key = `${state.currentPlayerId}:${card.id}:${state.currentCardIndex}`;
+    if (state.acceptedCardKeys.includes(key)) return state;
+
     const queue = state.queue.map((p) => p.id === state.currentPlayerId ? { ...p, score: p.score + card.points, status: 'in-session' as const } : p);
     const updated = queue.find((p) => p.id === state.currentPlayerId)!;
     const existing = state.leaderboard.find((entry) => entry.name.toLowerCase() === updated.name.toLowerCase());
     const leaderboard = (existing
       ? state.leaderboard.map((entry) => entry.name.toLowerCase() === updated.name.toLowerCase() ? { ...entry, score: updated.score, badge: updated.score >= 300 ? 'On fire' : entry.badge } : entry)
       : [...state.leaderboard, { id: `leader-${Date.now()}`, name: updated.name, score: updated.score, badge: 'New challenger' }]).sort((a, b) => b.score - a.score);
-    return { ...state, queue, leaderboard, chat: [...state.chat, { id: `chat-${Date.now()}`, sender: 'Host', text: `${updated.name} accepted: ${card.prompt}` }] };
+    return { ...state, queue, leaderboard, acceptedCardKeys: [...state.acceptedCardKeys, key], chat: [...state.chat, { id: `chat-${Date.now()}`, sender: 'Host', text: `${updated.name} accepted: ${card.prompt}` }] };
   });
 }
 
