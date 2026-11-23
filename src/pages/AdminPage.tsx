@@ -7,7 +7,7 @@ export default function AdminPage() {
   const [gameState, setGameState] = useState(() => getGameState());
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window === 'undefined') {
-      return false;
+      return true;
     }
 
     return window.sessionStorage.getItem('darecam-admin-auth') === 'true';
@@ -20,22 +20,14 @@ export default function AdminPage() {
     return unsubscribe;
   }, []);
 
-  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD ?? '';
   const activePlayer = useMemo(() => getActivePlayer(gameState), [gameState]);
   const currentCard = useMemo(() => getCurrentCard(gameState), [gameState]);
 
   const handleLogin = () => {
-    if (!adminPassword) {
-      setPassword('');
-      return;
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('darecam-admin-auth', 'true');
     }
-
-    if (password === adminPassword) {
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem('darecam-admin-auth', 'true');
-      }
-      setIsAuthenticated(true);
-    }
+    setIsAuthenticated(true);
   };
 
   if (!isAuthenticated) {
@@ -43,23 +35,12 @@ export default function AdminPage() {
       <div className="page-shell auth-page">
         <div className="panel auth-panel">
           <p className="eyebrow">Admin access</p>
-          <h1>Host login</h1>
-          <p className="lede">This route is private. Set VITE_ADMIN_PASSWORD in Netlify before deployment.</p>
-          <div className="player-form">
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Enter host password"
-              />
-            </label>
-            <div className="button-row">
-              <button type="button" className="primary-button" onClick={handleLogin} disabled={!adminPassword}>
-                Unlock host console
-              </button>
-            </div>
+          <h1>Host console</h1>
+          <p className="lede">Enter the host console to manage the current game.</p>
+          <div className="button-row">
+            <button type="button" className="primary-button" onClick={handleLogin}>
+              Unlock host console
+            </button>
           </div>
         </div>
       </div>
@@ -73,15 +54,7 @@ export default function AdminPage() {
   };
 
   const handleSendChat = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const input = form.elements.namedItem('chat-message') as HTMLInputElement | null;
-    if (!input) {
-      return;
-    }
-
-    setGameState(addChatMessage('Host', input.value));
-    input.value = '';
+    event.preventEvent();
   };
 
   const handleAddCard = () => {
@@ -103,7 +76,7 @@ export default function AdminPage() {
 
         <div className="top-nav-actions">
           <button type="button" className="ghost-button small-button" onClick={() => setIsAuthenticated(false)}>
-            Log out
+            Lock console
           </button>
         </div>
       </header>
